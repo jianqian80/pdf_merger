@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "smart-pdf-merger"
+version = "0.1.0"
+dependencies = [
+    "PyPDF2",
+    "Pillow",
+]
+
+[project.scripts]
+# This defines the command name and where it points
+# Syntax: command_name = "package.module:function"
+pdfmerge = "pdf_merger.core:run_cli"
