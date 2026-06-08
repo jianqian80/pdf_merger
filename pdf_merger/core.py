@@ -1,11 +1,32 @@
 import PyPDF2
 import os
 import argparse
-from PIL import Image
+from PIL import Image, ImageOps
 import io
+
+try:
+    from pillow_heif import register_heif_opener
+except ImportError:
+    register_heif_opener = None
+else:
+    register_heif_opener()
+
+
+IMAGE_EXTS = ('.png', '.jpg', '.jpeg', '.webp', '.heic', '.heif')
+HEIF_EXTS = ('.heic', '.heif')
+
+
+def ensure_supported_image(image_path):
+    if image_path.lower().endswith(HEIF_EXTS) and register_heif_opener is None:
+        raise RuntimeError(
+            "HEIC/HEIF files require pillow-heif. Install it with: "
+            "python -m pip install pillow-heif"
+        )
 
 
 def convert_image_to_pdf(image_path):
+    ensure_supported_image(image_path)
+
     # A4 dimensions in points
     A4_WIDTH_PTS = 595
     A4_HEIGHT_PTS = 842
@@ -23,7 +44,7 @@ def convert_image_to_pdf(image_path):
     target_width_px = canvas_width_px 
     target_height_px = canvas_height_px 
 
-    img = Image.open(image_path)
+    img = ImageOps.exif_transpose(Image.open(image_path)).convert('RGB')
     # Use LANCZOS for the highest quality downscaling
     img.thumbnail((target_width_px, target_height_px), Image.Resampling.LANCZOS)
     
@@ -86,10 +107,7 @@ def convert_image_to_pdf(image_path):
 def smart_merge(root_folder, output_name):
     master_merger = PyPDF2.PdfMerger()
     items = sorted(os.listdir(root_folder))
-    
-    # Supported formats
-    image_exts = ('.png', '.jpg', '.jpeg', '.webp')
-    
+
     for item in items:
         item_path = os.path.join(root_folder, item)
         
@@ -101,7 +119,7 @@ def smart_merge(root_folder, output_name):
             if item.lower().endswith('.pdf'):
                 print(f"Adding PDF: {item}")
                 master_merger.append(item_path)
-            elif item.lower().endswith(image_exts):
+            elif item.lower().endswith(IMAGE_EXTS):
                 print(f"Converting & Adding Image: {item}")
                 img_pdf = convert_image_to_pdf(item_path)
                 master_merger.append(img_pdf)
@@ -112,7 +130,7 @@ def smart_merge(root_folder, output_name):
             print(f"Entering Folder: {item}")
             # Identify valid files
             sub_items = sorted([f for f in os.listdir(item_path) 
-                               if f.lower().endswith(('.pdf', 'png', 'jpg', 'jpeg', 'webp'))])
+                               if f.lower().endswith(('.pdf',) + IMAGE_EXTS)])
             
             if sub_items:
                 folder_merger = PyPDF2.PdfMerger()
